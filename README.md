@@ -3,7 +3,7 @@
 MAVProxy_OSD
 
 This is a fork of MAVProxy ground station written in python. 
-This MAVProxy_OSD is edited from ![MAVProxy horizon module](https://ardupilot.org/mavproxy/docs/modules/horizon.html)
+This MAVProxy_OSD is edited from MAVProxy horizon module(https://ardupilot.org/mavproxy/docs/modules/horizon.html)
 .
 
 
