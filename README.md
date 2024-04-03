@@ -1,8 +1,11 @@
 ![GitHub Actions](https://github.com/ardupilot/MAVProxy/actions/workflows/windows_build.yml/badge.svg)
 
-MAVProxy
+MAVProxy_OSD
 
-This is a MAVLink ground station written in python. 
+This is a fork of MAVProxy ground station written in python. 
+This MAVProxy_OSD is edited from ![MAVProxy horizon module](https://ardupilot.org/mavproxy/docs/modules/horizon.html)
+.
+
 
 Please see https://ardupilot.org/mavproxy/index.html for more information
 
