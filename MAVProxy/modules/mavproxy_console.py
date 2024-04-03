@@ -42,7 +42,7 @@ class ConsoleModule(mp_module.MPModule):
         # setup some default status information
         mpstate.console.set_status('Mode', 'UNKNOWN', row=0, fg='blue')
         mpstate.console.set_status('SysID', '', row=0, fg='blue')
-        mpstate.console.set_status('ARM', 'ARM', fg='grey', row=0)
+        mpstate.console.set_status('ARM', 'ARM', fg='grey', row=0) # osd including ? text instead of color
         mpstate.console.set_status('GPS', 'GPS: --', fg='red', row=0)
         mpstate.console.set_status('GPS2', '', fg='red', row=0)
         mpstate.console.set_status('Vcc', 'Vcc: --', fg='red', row=0)
@@ -59,7 +59,7 @@ class ConsoleModule(mp_module.MPModule):
         mpstate.console.set_status('AGL', 'AGL ---/---', row=2)
         mpstate.console.set_status('AirSpeed', 'AirSpeed --', row=2)
         mpstate.console.set_status('GPSSpeed', 'GPSSpeed --', row=2)
-        mpstate.console.set_status('Thr', 'Thr ---', row=2)
+        mpstate.console.set_status('Thr', 'Thr ---', row=2)  # osd including
         mpstate.console.set_status('Roll', 'Roll ---', row=2)
         mpstate.console.set_status('Pitch', 'Pitch ---', row=2)
         mpstate.console.set_status('Wind', 'Wind ---/---', row=2)
@@ -68,7 +68,7 @@ class ConsoleModule(mp_module.MPModule):
         mpstate.console.set_status('WPBearing', 'Bearing ---', row=3)
         mpstate.console.set_status('AltError', 'AltError --', row=3)
         mpstate.console.set_status('AspdError', 'AspdError --', row=3)
-        mpstate.console.set_status('FlightTime', 'FlightTime --', row=3)
+        mpstate.console.set_status('FlightTime', 'FlightTime --', row=3) # osd including
         mpstate.console.set_status('ETR', 'ETR --', row=3)
         mpstate.console.set_status('Params', 'Param ---/---', row=3)
         mpstate.console.set_status('Mission', 'Mission --/--', row=3)
@@ -336,7 +336,7 @@ class ConsoleModule(mp_module.MPModule):
         if type == 'SYS_STATUS':
             self.check_critical_error(msg)
 
-        if not self.message_is_from_primary_vehicle(msg):
+        if not self.is_primary_vehicle(msg):
             # don't process msgs from other than primary vehicle, other than
             # updating vehicle list
             return
@@ -540,6 +540,13 @@ class ConsoleModule(mp_module.MPModule):
             self.console.set_status('PWR', status, fg=fg)
             self.console.set_status('Srv', 'Srv %.2f' % (msg.Vservo*0.001), fg='green')
         elif type in ['HEARTBEAT', 'HIGH_LATENCY2']:
+            if msg.get_srcComponent() in [mavutil.mavlink.MAV_COMP_ID_ADSB,
+                                          mavutil.mavlink.MAV_COMP_ID_ODID_TXRX_1,
+                                          mavutil.mavlink.MAV_COMP_ID_ODID_TXRX_2,
+                                          mavutil.mavlink.MAV_COMP_ID_ODID_TXRX_3]:
+                # ignore these
+                return
+
             fmode = master.flightmode
             if self.settings.vehicle_name:
                 fmode = self.settings.vehicle_name + ':' + fmode

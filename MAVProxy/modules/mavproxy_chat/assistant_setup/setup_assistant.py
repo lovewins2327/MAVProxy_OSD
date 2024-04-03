@@ -6,8 +6,6 @@ This script is used to setup the OpenAI assistant for the AI Chat Module.
 
 OpenAI Assistant API: https://platform.openai.com/docs/api-reference/assistants
 OpenAI Assistant Playground: https://platform.openai.com/playground
-
-AP_FLAKE8_CLEAN
 '''
 
 import requests
@@ -17,26 +15,25 @@ import os
 
 try:
     from openai import OpenAI
-except Exception:
+except:
     print("chat: failed to import openai. See https://ardupilot.org/mavproxy/docs/modules/chat.html")
     exit()
 
-
 # main function
 def main(openai_api_key=None, assistant_name=None, model_name=None, upgrade=False):
-
+    
     print("Starting assistant setup")
-
+    
     # create connection object
     try:
         # if api key is provided, use it to create connection object
         if openai_api_key is not None:
             client = OpenAI(api_key=openai_api_key)
         else:
-            # if no api key is provided, attempt to create connection object without it
-            # user may have set the OPENAI_API_KEY environment variable
-            client = OpenAI()
-    except Exception:
+          # if no api key is provided, attempt to create connection object without it
+          # user may have set the OPENAI_API_KEY environment variable 
+          client = OpenAI()
+    except:
         # if connection object creation fails, exit with error message
         print("setup_assistant: failed to connect to OpenAI.  Perhaps the API key was incorrect?")
         exit()
@@ -52,7 +49,7 @@ def main(openai_api_key=None, assistant_name=None, model_name=None, upgrade=Fals
     # check that assistant_instructions.txt file exists
     instructions_filename = os.path.join(os.getcwd(), "assistant_instructions.txt")
     if not os.path.isfile(instructions_filename):
-        print("setup_assistant: " + instructions_filename + " not found")
+        print("setup_assistant: " + instructions_filename +" not found")
         exit()
 
     # check that at least one text file exists.  E.g. text files holding the flight mode number to name mappings
@@ -75,7 +72,7 @@ def main(openai_api_key=None, assistant_name=None, model_name=None, upgrade=Fals
             function_object = json.load(function_file)
             function_tools.append(function_object)
             print("setup_assistant: parsed function file: " + os.path.basename(function_filename))
-        except Exception:
+        except:
             print("setup_assistant: failed to parse json file: " + function_filename)
             exit()
 
@@ -87,7 +84,7 @@ def main(openai_api_key=None, assistant_name=None, model_name=None, upgrade=Fals
     # download latest MAVLink files from ardupilot MAVLink repo, minimal.xml, common.xml and ardupilotmega.xml
     mavlink_filenames = ["minimal.xml", "common.xml", "ardupilotmega.xml"]
     for mavlink_filename in mavlink_filenames:
-        if not download_file("https://raw.githubusercontent.com/ArduPilot/mavlink/master/message_definitions/v1.0/" + mavlink_filename, mavlink_filename):  # noqa
+        if not download_file("https://raw.githubusercontent.com/ArduPilot/mavlink/master/message_definitions/v1.0/" + mavlink_filename, mavlink_filename):
             exit()
 
     # variable to hold new assistant
@@ -115,7 +112,7 @@ def main(openai_api_key=None, assistant_name=None, model_name=None, upgrade=Fals
     try:
         instructions_content = open(instructions_filename, 'r').read()
         client.beta.assistants.update(assistant.id, instructions=instructions_content, tools=function_tools)
-    except Exception:
+    except:
         print("setup_assistant: failed to update assistant instructions")
         exit()
 
@@ -127,43 +124,34 @@ def main(openai_api_key=None, assistant_name=None, model_name=None, upgrade=Fals
         try:
             # open local file as read-only
             file = open(filename, 'rb')
-        except Exception:
+        except:
             print("setup_assistant: failed to open file: " + filename)
             exit()
 
-        # check if OpenAI has existing files with the same name
-        file_needs_uploading = True
+        # if OpenAI has existing files with the same name, delete them
+        # Note: this is slightly dangerous because files in use by another assistant could be deleted
         for existing_file in existing_files.data:
             if filename == existing_file.filename:
-                # if not upgrading, we associate the existing file with our assistant
-                if not upgrade:
-                    uploaded_file_ids.append(existing_file.id)
-                    print("setup_assistant: using existing file: " + filename)
-                    file_needs_uploading = False
-                else:
-                    # if upgrading them we delete and re-upload the file
-                    # Note: this is slightly dangerous because files in use by another assistant could be deleted
-                    try:
-                        client.files.delete(existing_file.id)
-                        print("setup_assistant: deleted existing file: " + filename)
-                    except Exception:
-                        print("setup_assistant: failed to delete file from OpenAI: " + filename)
-                        exit()
+                try:
+                    client.files.delete(existing_file.id)
+                    print("setup_assistant: deleted existing file: " + filename)
+                except:
+                    print("setup_assistant: failed to delete file from OpenAI: " + filename)
+                    exit()
 
         # upload file to OpenAI
-        if file_needs_uploading:
-            try:
-                uploaded_file = client.files.create(file=file, purpose="assistants")
-                uploaded_file_ids.append(uploaded_file.id)
-                print("setup_assistant: uploaded: " + filename)
-            except Exception:
-                print("setup_assistant: failed to upload file to OpenAI: " + filename)
-                exit()
+        try:
+            uploaded_file = client.files.create(file=file, purpose="assistants")
+            uploaded_file_ids.append(uploaded_file.id)
+            print("setup_assistant: uploaded: " + filename)
+        except:
+            print("setup_assistant: failed to upload file to OpenAI: " + filename)
+            exit()
 
     # update assistant's accessible files
     try:
         client.beta.assistants.update(assistant.id, file_ids=uploaded_file_ids)
-    except Exception:
+    except:
         print("setup_assistant: failed to update assistant accessible files")
         exit()
 
@@ -172,12 +160,11 @@ def main(openai_api_key=None, assistant_name=None, model_name=None, upgrade=Fals
         try:
             os.remove(mavlink_filename)
             print("setup_assistant: deleted local file: " + mavlink_filename)
-        except Exception:
+        except:
             print("setup_assistant: failed to delete file: " + mavlink_filename)
 
     # print completion message
     print("Assistant setup complete")
-
 
 def download_file(url, filename):
     # download file from url to filename
@@ -193,14 +180,13 @@ def download_file(url, filename):
         else:
             print("setup_assistant: failed to download file: " + url)
             return False
-    except Exception:
+    except:
         print("setup_assistant: failed to download file: " + url)
         return False
 
-
 # call main function if this is run as standalone script
 if __name__ == "__main__":
-
+    
     # parse command line arguments
     from argparse import ArgumentParser
     parser = ArgumentParser(description="MAVProxy AI chat module OpenAI Assistant setup script")

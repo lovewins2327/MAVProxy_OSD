@@ -59,7 +59,6 @@ class MissionItemProtocolModule(mp_module.MPModule):
 
     def gui_menu_items(self):
         return [
-            MPMenuItem('FTP', 'FTP', '# %s ftp' % self.command_name()),
             MPMenuItem('Clear', 'Clear', '# %s clear' % self.command_name()),
             MPMenuItem('List', 'List', '# %s list' % self.command_name()),
             MPMenuItem(
@@ -864,8 +863,6 @@ on'''
             print("%s module not available; use old compat modules" % str(self.itemtype()))
             return
         return {
-            "ftp": self.wp_ftp_download,
-            "ftpload": self.wp_ftp_upload,
             "clear": self.cmd_clear,
             "list": self.cmd_list,
             "load": (self.cmd_load, ["(FILENAME)"]),
@@ -965,7 +962,7 @@ on'''
             mission_type=self.mav_mission_type())
 
     def wp_ftp_download(self, args):
-        '''Download items from vehicle with ftp'''
+        '''Download wpts from vehicle with ftp'''
         ftp = self.mpstate.module('ftp')
         if ftp is None:
             print("Need ftp module")
@@ -974,7 +971,7 @@ on'''
         ftp.cmd_get([self.mission_ftp_name()], callback=self.ftp_callback, callback_progress=self.ftp_callback_progress)
 
     def ftp_callback_progress(self, fh, total_size):
-        '''progress callback from ftp fetch of mission items'''
+        '''progress callback from ftp fetch of mission'''
         if self.ftp_count is None and total_size >= 10:
             ofs = fh.tell()
             fh.seek(0)
@@ -990,7 +987,7 @@ on'''
             self.mpstate.console.set_status('Mission', 'Mission %u/%u' % (done, self.ftp_count))
 
     def ftp_callback(self, fh):
-        '''callback from ftp fetch of mission items'''
+        '''callback from ftp fetch of mission'''
         if fh is None:
             print("mission: failed ftp download")
             return
@@ -998,10 +995,10 @@ on'''
         data = fh.read()
         magic2, dtype, options, start, num_items = struct.unpack("<HHHHH", data[0:10])
         if magic != magic2:
-            print("%s: bad magic 0x%x expected 0x%x" % (self.itemtype(), magic2, magic))
+            print("mission: bad magic 0x%x expected 0x%x" % (magic2, magic))
             return
-        if dtype != self.mav_mission_type():
-            print("%s: bad data type %u" % (self.itemtype(), dtype))
+        if dtype != mavutil.mavlink.MAV_MISSION_TYPE_MISSION:
+            print("mission: bad data type %u" % dtype)
             return
 
         self.wploader.clear()
@@ -1054,11 +1051,11 @@ on'''
         except Exception as msg:
             print("Unable to load %s - %s" % (filename, msg))
             return
-        print("Loaded %u %s from %s" % (self.wploader.count(), self.itemstype(), filename))
-        print("Sending %s with ftp" % self.itemstype())
+        print("Loaded %u waypoints from %s" % (self.wploader.count(), filename))
+        print("Sending mission with ftp")
 
         fh = SIO()
-        fh.write(struct.pack("<HHHHH", 0x763d, self.mav_mission_type(), 0, 0, self.wploader.count()))
+        fh.write(struct.pack("<HHHHH", 0x763d, mavutil.mavlink.MAV_MISSION_TYPE_MISSION, 0, 0, self.wploader.count()))
         mavmsg = mavutil.mavlink.MAVLink_mission_item_int_message
         for i in range(self.wploader.count()):
             w = self.wploader.wp(i)
@@ -1077,7 +1074,7 @@ on'''
                     fh=fh, callback=self.ftp_upload_callback, progress_callback=self.ftp_upload_progress)
 
     def ftp_upload_progress(self, proportion):
-        '''callback from ftp put of items'''
+        '''callback from ftp put of mission'''
         if proportion is None:
             self.mpstate.console.set_status('Mission', 'Mission ERR')
         else:
@@ -1085,10 +1082,10 @@ on'''
             self.mpstate.console.set_status('Mission', 'Mission %u/%u' % (int(proportion*count), count))
 
     def ftp_upload_callback(self, dlen):
-        '''callback from ftp put of items'''
+        '''callback from ftp put of mission'''
         if dlen is None:
-            print("Failed to send %s" % self.itemstype())
+            print("Failed to send waypoints")
         else:
             mavmsg = mavutil.mavlink.MAVLink_mission_item_int_message
             item_size = mavmsg.unpacker.size
-            print("Sent %s of length %u in %.2fs" % (self.itemtype(), (dlen - 10) // item_size, time.time() - self.upload_start))
+            print("Sent mission of length %u in %.2fs" % ((dlen - 10) // item_size, time.time() - self.upload_start))

@@ -205,11 +205,9 @@ class MPModule(object):
             label = str(link.linknum+1)
         return label
 
-    def message_is_from_primary_vehicle(self, msg):
+    def is_primary_vehicle(self, msg):
         '''see if a msg is from our primary vehicle'''
         sysid = msg.get_srcSystem()
-        compid = msg.get_srcComponent()
-        if ((self.target_system == 0 or self.target_system == sysid) and
-           (self.target_component == 0 or self.target_component == compid)):
+        if self.target_system == 0 or self.target_system == sysid:
             return True
         return False

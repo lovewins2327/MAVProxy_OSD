@@ -30,7 +30,6 @@ from MAVProxy.modules.lib.mp_menu import *
 import MAVProxy.modules.lib.mp_util as mp_util
 from pymavlink import mavutil
 from pymavlink import mavwp
-from pymavlink import DFReader
 from MAVProxy.modules.lib.mp_settings import MPSettings, MPSetting
 from MAVProxy.modules.lib import wxsettings
 from MAVProxy.modules.lib.graphdefinition import GraphDefinition
@@ -106,7 +105,7 @@ class MEState(object):
               MPSetting('condition', str, None, 'condition'),
               MPSetting('xaxis', str, None, 'xaxis'),
               MPSetting('linestyle', str, None, 'linestyle'),
-              MPSetting('show_flightmode', int, 1, 'show flightmode'),
+              MPSetting('show_flightmode', bool, True, 'show flightmode'),
               MPSetting('sync_xzoom', bool, True, 'sync X-axis zoom'),
               MPSetting('sync_xmap', bool, True, 'sync X-axis zoom for map'),
               MPSetting('legend', str, 'upper left', 'legend position'),
@@ -126,10 +125,8 @@ class MEState(object):
             "set"       : ["(SETTING)"],
             "condition" : ["(VARIABLE)"],
             "graph"     : ['(VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE)'],
-            "dump"      : ['(MESSAGETYPE)', '--verbose (MESSAGETYPE)'],
             "map"       : ['(VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE) (VARIABLE)'],
             "param"     : ['download', 'check', 'help (PARAMETER)'],
-            "logmessage": ['download', 'help (MESSAGETYPE)'],
             }
         self.aliases = {}
         self.graphs = []
@@ -334,9 +331,6 @@ def load_graphs():
     mestate.graphs = []
     gfiles = ['mavgraphs.xml']
     for dirname, dirnames, filenames in os.walk(mp_util.dot_mavproxy()):
-        # Skip XML files in the LogMessages subfolder
-        if os.path.basename(dirname) == "LogMessages":
-            continue
         for filename in filenames:
             if filename.lower().endswith('.xml'):
                 gfiles.append(os.path.join(dirname, filename))
@@ -430,10 +424,7 @@ def cmd_map(args):
         options.types = ','.join(args)
         if len(options.types) > 1:
             options.colour_source='type'
-    mfv_mav_ret = mavflightview.mavflightview_mav(mestate.mlog, options, mestate.flightmode_selections)
-    if mfv_mav_ret is None:
-        return
-    [path, wp, fen, used_flightmodes, mav_type, instances] = mfv_mav_ret
+    [path, wp, fen, used_flightmodes, mav_type, instances] = mavflightview.mavflightview_mav(mestate.mlog, options, mestate.flightmode_selections)
     global map_timelim_pipes
     timelim_pipe = multiproc.Pipe()
     child = multiproc.Process(target=mavflightview.mavflightview_show, args=[path, wp, fen, used_flightmodes, mav_type, options, instances, None, timelim_pipe])
@@ -525,8 +516,6 @@ def cmd_dump(args):
             continue
         if verbose and "pymavlink.dialects" in str(type(msg)):
             mavutil.dump_message_verbose(sys.stdout, msg)
-        elif verbose and hasattr(msg,"dump_verbose"):
-            msg.dump_verbose(sys.stdout)
         else:
             print("%s %s" % (timestring(msg), msg))
     mlog.rewind()
@@ -695,17 +684,9 @@ events = {
     71 : "DATA_ZIGZAG_STORE_A",
     72 : "DATA_ZIGZAG_STORE_B",
     73 : "DATA_LAND_REPO_ACTIVE",
-    74 : "DATA_STANDBY_ENABLE",
-    75 : "DATA_STANDBY_DISABLE",
 
     80 : "FENCE_FLOOR_ENABLE",
     81 : "FENCE_FLOOR_DISABLE",
-
-    85 : "EK3_SOURCES_SET_TO_PRIMARY",
-    86 : "EK3_SOURCES_SET_TO_SECONDARY",
-    87 : "EK3_SOURCES_SET_TO_TERTIARY",
-
-    90 : "AIRSPEED_PRIMARY_CHANGED",
 
     163 : "DATA_SURFACED",
     164 : "DATA_NOT_SURFACED",
@@ -743,71 +724,42 @@ subsystems = {
     27 : "FAILSAFE_LEAK",
     28 : "PILOT_INPUT",
     29 : "FAILSAFE_VIBE",
-    30 : "INTERNAL_ERROR",
-    31 : "FAILSAFE_DEADRECKON",
 }
 
-error_codes = {
-    "RADIO" : { # subsystem specific error codes -- radio
-        2: "RADIO_LATE_FRAME",
-    },
-    "FAILSAFE_FENCE" : { # for failsafe fence, non-zero is a bitmask
-        0: "FAILSAFE_RESOLVED",
-        '*': "Fence:#",
-    },
-    "FAILSAFE*" : { # subsystem specific error codes -- failsafe_thr, batt, gps
-        0: "FAILSAFE_RESOLVED",
-        1: "FAILSAFE_OCCURRED",
-    },
-    "MAIN" : { # subsystem specific error codes -- main
-        1: "MAIN_INS_DELAY",
-    },
-    "CRASH_CHECK" : { # subsystem specific error codes -- crash checker
-        1: "CRASH_CHECK_CRASH",
-        2: "CRASH_CHECK_LOSS_OF_CONTROL",
-    },
-    "FLIP" : { # subsystem specific error codes -- flip
-        2: "FLIP_ABANDONED",
-    },
-    "TERRAIN" : { # subsystem specific error codes -- terrain
-        2: "MISSING_TERRAIN_DATA",
-    },
-    "NAVIGATION" : { # subsystem specific error codes -- navigation
-        2: "FAILED_TO_SET_DESTINATION",
-        3: "RESTARTED_RTL",
-        4: "FAILED_CIRCLE_INIT",
-        5: "DEST_OUTSIDE_FENCE",
-        6: "RTL_MISSING_RNGFND",
-    },
-    "INTERNAL_ERROR" : { # subsystem specific error codes -- internal_error
-        1: "INTERNAL_ERRORS_DETECTED",
-    },
-    "PARACHUTES" : { # parachute failed to deploy because of low altitude or landed
-        2: "PARACHUTE_TOO_LOW",
-        3: "PARACHUTE_LANDED",
-    },
-    "EKFCHECK" : { # EKF check definitions
-        2: "EKFCHECK_BAD_VARIANCE",
-        0: "EKFCHECK_VARIANCE_CLEARED",
-    },
-    "BARO" : { # Baro specific error codes
-        2: "BARO_GLITCH",
-        3: "BAD_DEPTH", # sub-only
-    },
-    "GPS" : { # GPS specific error coces
-        2: "GPS_GLITCH",
-    },
-    "EKF_PRIMARY" : { # EKF primary - code is the EKF number
-        '*': "EKF:#",
-    },
-    "FLIGHT_MODE" : { # flight mode - code is the mode number
-        '*': "Mode:#",
-    },
-    "*" : { # general error codes
-        0: "ERROR_RESOLVED",
-        1: "FAILED_TO_INITIALISE",
-        4: "UNHEALTHY",
-    }
+error_codes = { # not used yet
+    "ERROR_RESOLVED" : 0,
+    "FAILED_TO_INITIALISE" : 1,
+    "UNHEALTHY" : 4,
+    # subsystem specific error codes -- radio
+    "RADIO_LATE_FRAME" : 2,
+    # subsystem specific error codes -- failsafe_thr, batt, gps
+    "FAILSAFE_RESOLVED" : 0,
+    "FAILSAFE_OCCURRED" : 1,
+    # subsystem specific error codes -- main
+    "MAIN_INS_DELAY" : 1,
+    # subsystem specific error codes -- crash checker
+    "CRASH_CHECK_CRASH" : 1,
+    "CRASH_CHECK_LOSS_OF_CONTROL" : 2,
+    # subsystem specific error codes -- flip
+    "FLIP_ABANDONED" : 2,
+    # subsystem specific error codes -- terrain
+    "MISSING_TERRAIN_DATA" : 2,
+    # subsystem specific error codes -- navigation
+    "FAILED_TO_SET_DESTINATION" : 2,
+    "RESTARTED_RTL" : 3,
+    "FAILED_CIRCLE_INIT" : 4,
+    "DEST_OUTSIDE_FENCE" : 5,
+    # parachute failed to deploy because of low altitude or landed
+    "PARACHUTE_TOO_LOW" : 2,
+    "PARACHUTE_LANDED" : 3,
+    # EKF check definitions
+    "EKFCHECK_BAD_VARIANCE" : 2,
+    "EKFCHECK_VARIANCE_CLEARED" : 0,
+    # Baro specific error codes
+    "BARO_GLITCH" : 2,
+    "BAD_DEPTH" : 3,
+    # GPS specific error coces
+    "GPS_GLITCH" : 2,
 }
     
 def cmd_messages(args):
@@ -837,19 +789,6 @@ def cmd_messages(args):
         if matches:
             print("%s %s" % (m_timestring, mstr))
 
-    def get_error_code(subsys, ecode):
-        for e in error_codes:
-            if e.endswith('*'):
-                subsys_match = subsys.startswith(e[:-1])
-            else:
-                subsys_match = subsys == e
-            if subsys_match:
-                if ecode in error_codes[e]:
-                    return error_codes[e][ecode]
-                elif "*" in error_codes[e]:
-                    return error_codes[e]['*'].replace("#",str(ecode))
-        return str(ecode)
-
     mestate.mlog.rewind()
     types = set(['MSG','EV','ERR', 'STATUSTEXT'])
     while True:
@@ -861,9 +800,7 @@ def cmd_messages(args):
         elif m.get_type() == 'EV':
             mstr = "Event: %s" % events.get(m.Id, str(m.Id))
         elif m.get_type() == 'ERR':
-            subsys = subsystems.get(m.Subsys, str(m.Subsys))
-            ecode = get_error_code(subsys, m.ECode)
-            mstr = "Error: Subsys %s ECode %s " % (subsys, ecode)
+            mstr = "Error: Subsys %s ECode %u " % (subsystems.get(m.Subsys, str(m.Subsys)), m.ECode)
         else:
             mstr = m.text
 
@@ -1184,44 +1121,6 @@ def cmd_paramchange(args):
         vmap[pname] = pvalue
     mestate.mlog.rewind()
 
-
-def cmd_logmessage(args):
-    '''show log message information'''
-    mlog = mestate.mlog
-    usage = "Usage: logmessage <help|download>"
-    # Print usage and return, if we have no arguments
-    if len(args) <= 0:
-        print(usage)
-        return
-    # help: print help for the requested log message
-    if args[0] == 'help':
-        if len(args) < 2:
-            print(usage)
-            return
-        if hasattr(mlog, 'metadata'):
-            mlog.metadata.print_help(args[1])
-        elif isinstance(mlog, mavutil.mavlogfile):
-            print("logmessage help is not supported for telemetry log files")
-        else:
-            print("Incompatible pymavlink; upgrade pymavlink?")
-        return
-    # download: download XML files for log messages
-    if args[0] == 'download':
-        if not hasattr(DFReader, 'DFMetaData'):
-            print("Incompatible pymavlink; upgrade pymavlink?")
-            return
-        try:
-            child = multiproc.Process(target=DFReader.DFMetaData.download)
-            child.start()
-        except Exception as e:
-            print(e)
-        if hasattr(mlog, 'metadata'):
-            mlog.metadata.reset()
-        return
-    # Print usage if we've dropped through the ifs
-    print(usage)
-
-
 def cmd_mission(args):
     '''show mission'''
     if (len(args) == 1):
@@ -1292,7 +1191,7 @@ def cmd_devid(args):
         if p.startswith('COMPASS_DEV_ID') or p.startswith('COMPASS_PRIO') or (
                 p.startswith('COMPASS') and p.endswith('DEV_ID')):
             mp_util.decode_devid(params[p], p)
-        if p.startswith('INS') and p.endswith('_ID'):
+        if p.startswith('INS_') and p.endswith('_ID'):
             mp_util.decode_devid(params[p], p)
         if p.startswith('GND_BARO') and p.endswith('_ID'):
             mp_util.decode_devid(params[p], p)
@@ -1509,7 +1408,6 @@ command_map = {
     'dump'       : (cmd_dump,      'dump messages from log'),
     'file'       : (cmd_file,      'show files'),
     'mission'    : (cmd_mission,   'show mission'),
-    'logmessage' : (cmd_logmessage, 'show log message information'),
     }
 
 def progress_bar(pct):

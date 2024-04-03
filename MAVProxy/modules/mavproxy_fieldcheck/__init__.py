@@ -12,9 +12,6 @@ TODO:
  - ensure parameters are correct
  - add check that battery is within tolerances (chemistry issues...)
  - autodetect numcells being incorrect
-
-AP_FLAKE8_CLEAN
-
 '''
 
 import math
@@ -33,7 +30,6 @@ import pkg_resources
 if mp_util.has_wxpython:
     from MAVProxy.modules.lib.mp_menu import MPMenuItem
     from MAVProxy.modules.lib.mp_menu import MPMenuSubMenu
-
 
 class FieldCheck(object):
     def __init__(self):
@@ -109,18 +105,12 @@ class FieldCheck(object):
     def check_parameters(self, fix=False):
         '''check key parameters'''
         want_values = {
-            "FENCE_ENABLE": 1,
-            "FENCE_ACTION": 1,  # 4 is break-or-land on Copter!
+            "FENCE_ACTION": 4,
             "FENCE_ALT_MAX": self.fc_settings.param_fence_maxalt,
             "THR_FAILSAFE": 1,
             "FS_SHORT_ACTN": 0,
             "FS_LONG_ACTN": 1,
         }
-
-        if self.vehicle_type == mavutil.mavlink.MAV_TYPE_FIXED_WING:
-            want_values["FENCE_ACTION"] = 1  # RTL
-        elif self.vehicle_type == mavutil.mavlink.MAV_TYPE_QUADROTOR:
-            want_values["FENCE_ACTION"] = 4  # Brake or RTL
 
         ret = True
         for key in want_values.keys():
@@ -135,23 +125,6 @@ class FieldCheck(object):
                 if fix:
                     self.whinge('Setting %s to %f' % (key, want))
                     self.mav_param.mavset(self.master, key, want, retries=3)
-
-        # ensure there is a fence enable/disable switch configured:
-        required_options = {
-            11: "Fence Enable/Disable",
-        }
-        for required_option in required_options.keys():
-            found = False
-            for chan in range(1, 17):
-                rc_option_param_name = f"RC{chan}_OPTION"
-                got = self.mav_param.get(rc_option_param_name, None)
-                if got == required_option:
-                    found = True
-                    break
-            if not found:
-                self.whinge("RC channel option %u (%s) must be configured" %
-                            (required_option, required_options[required_option]))
-                ret = False
 
         return ret
 
@@ -353,9 +326,7 @@ class FieldCheck(object):
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
         if not self.done_heartbeat_check:
-            m = self.master.messages.get('HEARTBEAT')
-            if m is not None:
-                self.vehicle_type = m.type
+            if self.master.messages.get('HEARTBEAT') is not None:
                 self.check()
                 self.done_heartbeat_check = True
 
@@ -399,7 +370,7 @@ class FieldCheck(object):
         self.check_map_menu()
 
     def FC_MPSetting(self, name, atype, default, description):
-        # xname = "fc_%s_%s" % (self.lc_name, name)
+        xname = "fc_%s_%s" % (self.lc_name, name)
         return MPSetting(name, atype, default, description)
 
     def select(self):
@@ -472,21 +443,17 @@ class FieldCheck(object):
             print(usage)
             return
 
-
 class FieldCMAC(FieldCheck):
     lc_name = "cmac"
     location = mavutil.location(-35.363261, 149.165230, 584, 353)
-
 
 class FieldSpringValley(FieldCheck):
     location = mavutil.location(-35.281315, 149.005329, 581, 280)
     lc_name = "springvalley"
 
-
 class FieldSpringValleyBottom(FieldCheck):
     location = mavutil.location(-35.2824450, 149.0053668, 593, 0)
     lc_name = "springvalleybottom"
-
 
 class FieldCheckModule(mp_module.MPModule):
     def __init__(self, mpstate):
@@ -522,6 +489,7 @@ class FieldCheckModule(mp_module.MPModule):
                 self.whinge("Selecting field (%s)" % field.lc_name)
                 self.select_field(field)
 
+
     def idle_task(self):
         '''run periodic tasks'''
         if self.field is not None:
@@ -541,7 +509,6 @@ class FieldCheckModule(mp_module.MPModule):
         if self.field is None:
             return
         self.field.mavlink_packet(m)
-
 
 def init(mpstate):
     '''initialise module'''

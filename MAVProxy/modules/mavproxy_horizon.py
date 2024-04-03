@@ -6,7 +6,7 @@
 
 from MAVProxy.modules.lib import wxhorizon
 from MAVProxy.modules.lib import mp_module
-from MAVProxy.modules.lib.wxhorizon_util import Attitude, VFR_HUD, Global_Position_INT, BatteryInfo, FlightState, WaypointInfo, FPS
+from MAVProxy.modules.lib.wxhorizon_util import Attitude, VFR_HUD, Global_Position_INT, BatteryInfo, FlightState, WaypointInfo, FPS, RC_CHANNELS, CAM_TEMP, STATUS_TEXT
 
 import time
 
@@ -14,7 +14,7 @@ class HorizonModule(mp_module.MPModule):
     def __init__(self, mpstate):
         # Define module load/unload reference and window title
         super(HorizonModule, self).__init__(mpstate, "horizon", "Horizon Indicator", public=True)
-        self.mpstate.horizonIndicator = wxhorizon.HorizonIndicator(title='Horizon Indicator')
+        self.mpstate.horizonIndicator = wxhorizon.HorizonIndicator(title='Custom OSD')
         self.mode = ''
         self.armed = ''
         self.currentWP = 0
@@ -25,7 +25,7 @@ class HorizonModule(mp_module.MPModule):
         self.wpBearing = 0
         self.msgList = []
         self.lastSend = 0.0
-        self.fps = 10.0
+        self.fps = 30.0
         self.sendDelay = (1.0/self.fps)*0.9
         self.add_command('horizon-fps',self.fpsInformation,"Get or change frame rate for horizon. Usage: horizon-fps set <fps>, horizon-fps get. Set fps to zero to get unrestricted framerate.")
         
@@ -98,6 +98,12 @@ class HorizonModule(mp_module.MPModule):
                 self.nextWPTime = '-'
             self.wpBearing = msg.target_bearing
             self.msgList.append(WaypointInfo(self.currentWP,self.finalWP,self.currentDist,self.nextWPTime,self.wpBearing))
+        elif msgType == 'RC_CHANNELS_RAW': ## add rc_channels
+            self.msgList.append(RC_CHANNELS(msg))
+        elif msgType == 'STATUSTEXT': ## wfb channel 
+            self.msgList.append(STATUS_TEXT(msg))
+        elif msgType == 'RAW_IMU': ## cam temp.
+            self.msgList.append(CAM_TEMP(msg))
 
     
     def idle_task(self):

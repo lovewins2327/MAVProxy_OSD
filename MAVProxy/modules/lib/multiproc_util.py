@@ -269,7 +269,7 @@ class MPDataLogChildTask(MPChildTask):
         '''
         Parameters
         ----------
-        mlog : DFReader / mavmmaplog
+        mlog : DFReader
             A dataflash or telemetry log
         '''
         super(MPDataLogChildTask, self).__init__(*args, **kwargs)
@@ -282,16 +282,10 @@ class MPDataLogChildTask(MPChildTask):
         '''Apply custom pickle wrappers to non-pickleable attributes'''
 
         # wrap filehandle and mmap in mlog for pickling
-        if hasattr(self._mlog,'filehandle'):
-            filehandle = self._mlog.filehandle
-        elif hasattr(self._mlog,'f'):
-            filehandle = self._mlog.f
+        filehandle = self._mlog.filehandle
         data_map = self._mlog.data_map
         data_len = self._mlog.data_len
-        if hasattr(self._mlog,'filehandle'):
-            self._mlog.filehandle = WrapFileHandle(filehandle)
-        elif hasattr(self._mlog,'f'):
-            self._mlog.f = WrapFileHandle(filehandle)
+        self._mlog.filehandle = WrapFileHandle(filehandle)
         self._mlog.data_map = WrapMMap(data_map, filehandle, data_len)
 
     # @override
@@ -299,14 +293,11 @@ class MPDataLogChildTask(MPChildTask):
         '''Unwrap custom pickle wrappers of non-pickleable attributes'''
 
         # restore the state of mlog
-        if hasattr(self._mlog,'filehandle'):
-            self._mlog.filehandle = self._mlog.filehandle.unwrap()
-        elif hasattr(self._mlog,'f'):
-            self._mlog.f = self._mlog.f.unwrap()
+        self._mlog.filehandle = self._mlog.filehandle.unwrap()
         self._mlog.data_map = self._mlog.data_map.unwrap()
 
     @property
     def mlog(self):
-        '''The dataflash or telemetry log (DFReader / mavmmaplog)'''
+        '''The dataflash log (DFReader)'''
 
         return self._mlog
