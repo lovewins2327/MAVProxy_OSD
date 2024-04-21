@@ -62,11 +62,12 @@ class CAM_TEMP():
     '''MAVLINK CAM TEMP TEXTS'''
     def __init__(self,CamMsg):
         self.CamT = CamMsg.temperature /100
+        #self.wifi = CamMsg.id
 
 class STATUS_TEXT():
     '''MAVLINK STATUS TEXTS'''
     def __init__(self,TextMsg):
-        self.Text = TextMsg.text[0:25]
+        self.Text = TextMsg.text[0:16]
 
         
         

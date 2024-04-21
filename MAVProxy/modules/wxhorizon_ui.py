@@ -78,13 +78,14 @@ class HorizonFrame(wx.Frame):
         #self.rc_6ch = 1000
         self.rc_ch7 = 1000
         self.rc_ch6 = 1000
-        self.resolution = '1080p 60fps'
+        self.resolution = '720p 60fps'
         self.rssi = 0
         self.toCh = ''
 
         # add STATUS TEXT
         self.CamT = 0
-        self.Text = 'not yet'
+        self.Text = ''
+        #self.wifi = 'not'
     
 
     def initUI(self):
@@ -444,8 +445,11 @@ class HorizonFrame(wx.Frame):
         ## camT
         self.CamTText = self.axes.text(self.rightPos+(self.vertSize/10.0),0.97-4.0*(self.vertSize+(0.5*self.vertSize/10.0)),'Cam: %d°C' %self.CamT, color='w',size=self.fontSize)
         self.CamTText.set_path_effects([PathEffects.withStroke(linewidth=1,foreground='k')])
+        ## wifi channel
+        # self.wifiText = self.axes.text(self.rightPos+(self.vertSize/10.0),0.97-4.0*(self.vertSize+(0.5*self.vertSize/10.0)),'Ch: %s' %self.wifi, color='w',size=self.fontSize)
+        # self.wifiText.set_path_effects([PathEffects.withStroke(linewidth=1,foreground='k')])
         ## status text
-        self.StatusText = self.axes.text(self.leftPos+(self.vertSize/10.0),0.97-4*(self.vertSize+(0.5*self.vertSize/10.0)),self.Text, color='w',size=self.fontSize)
+        self.StatusText = self.axes.text(self.leftPos+(self.vertSize/10.0),0.97-4*(self.vertSize+(0.5*self.vertSize/10.0)),"CH/TX: "+self.Text, color='w',size=self.fontSize)
         self.StatusText.set_path_effects([PathEffects.withStroke(linewidth=1,foreground='k')])
         ## rc_ch6 for wifi channel
         self.toChText = self.axes.text(self.leftPos+(self.vertSize/10.0),0.97-6*(self.vertSize+(0.5*self.vertSize/10.0)),self.toCh, color='w',size=self.fontSize)
@@ -469,9 +473,13 @@ class HorizonFrame(wx.Frame):
         self.CamTText.set_size(self.fontSize)
         self.CamTText.set_text('Cam: %d°C' %self.CamT)
 
+        # self.wifiText.set_position((self.rightPos-(self.rOffset+3.5)*self.batWidth,1-self.vertSize-(1.5)*self.batHeight))
+        # self.wifiText.set_size(self.fontSize)
+        # self.wifiText.set_text('Ch: %s' %self.wifi)
+
         self.StatusText.set_position((self.leftPos+(self.vertSize/10.0),0.97-4*(self.vertSize+(0.5*self.vertSize/10.0))))
         self.StatusText.set_size(self.fontSize)
-        self.StatusText.set_text(self.Text)
+        self.StatusText.set_text('CH/TX: '+self.Text)
         
         self.toChText.set_position((self.leftPos+(self.vertSize/10.0),0.97-6*(self.vertSize+(0.5*self.vertSize/10.0))))
         self.toChText.set_size(self.fontSize)
@@ -772,11 +780,12 @@ class HorizonFrame(wx.Frame):
                     self.updateStateText()
                 elif isinstance(obj, CAM_TEMP):
                     self.CamT = obj.CamT
+                    #self.wifi = obj.wifi
                     self.updateStateText()
                 
                 elif isinstance(obj, STATUS_TEXT):
-                    self.Text = obj.Text[0:25]
-                    new_ch = obj.Text[4:7]
+                    self.Text = obj.Text
+                    new_ch = obj.Text[0:3]
                     command = """awk -F " = " '$1 == "wifi_channel" {print $2}' /etc/wifibroadcast.cfg"""
                     process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
                     now_ch = process.communicate()[0][0:3]
